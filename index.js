@@ -77,7 +77,8 @@ var wholeTripCircleLayer =
     }
 
 //following url contains only one feature which is updated every ~100ms
-var url = 'http://localhost:63340/Drone_Live/pythonLocUpdate_Script/aiders.geojson';
+// var url = 'http://localhost:63340/Drone_Live/pythonLocUpdate_Script/aiders.geojson'; //Works as well
+var url = 'pythonLocUpdate_Script/aiders.geojson';
 
 //This object is required to display the yellow trail of the drone
 var droneTrailObject =
@@ -168,7 +169,7 @@ map.on('load', function ()
             popup.setLngLat(currentCoordinate);
             marker.setLngLat(currentCoordinate);
 
-            if (i === 80) //Random point to stop
+            if (i === 100) //Random point to stop
             {
                 clearMap(trailLayerStyle, marker, droneTimer, wholeTripCircleLayer)
             }
