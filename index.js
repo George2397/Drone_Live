@@ -65,8 +65,8 @@ var wholeTripCircleLayer =
 
     }
 
-//following url containts only one feature which is updated every ~100ms
-var url = 'http://localhost:63340/liveData_Drone3_YellowLine_SinglePoint/pythonLocUpdate_Script/aiders.geojson';
+//following url contains only one feature which is updated every ~100ms
+var url = 'http://localhost:63340/Drone_Live/pythonLocUpdate_Script/aiders.geojson';
 
 //This object is required to display the yellow trail of the drone
 var droneTrailObject =
