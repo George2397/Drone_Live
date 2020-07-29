@@ -32,6 +32,8 @@ body
 #mydiv {
     position: absolute;
     z-index: 9;
+    bottom: 0;
+    left:0;
     background-color: #f1f1f1;
     text-align: center;
     border: 1px solid #d3d3d3;
@@ -60,4 +62,20 @@ body
     position: fixed;
     top: 0;
     left: 0;
+}
+
+/*This is the style that is used to display the current lat, lon and zoom*/
+#sidebarStyle
+{
+    display: inline-block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    margin: 12px;
+    background-color: #404040;
+    color: #FFFFFF;
+    z-index: 1 !important;
+    padding: 6px;
+    font-weight: bold;
+
 }

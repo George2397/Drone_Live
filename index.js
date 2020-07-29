@@ -18,6 +18,16 @@ var map = new mapboxgl.Map({
     center: [ 33.4151176797,35.1452954125]
 });
 
+// Add zoom and rotation controls to the map.
+map.addControl(new mapboxgl.NavigationControl());
+
+map.on('mousemove', function(e) {
+    document.getElementById('sidebarStyle').innerHTML =
+        "Longitude: " + e.lngLat.lat.toFixed(5) + '<br />' +
+        "Latitude: " + e.lngLat.lng.toFixed(5) + '<br />' +
+        "Zoom: " + map.getZoom().toFixed(2)
+});
+
 var popup = new mapboxgl.Popup({closeOnClick: false})
     .setLngLat([33.4151176797, 35.1452954125])
     .setHTML('<h3>Drone Test</h3>')
@@ -32,6 +42,7 @@ var marker = new mapboxgl
     .addTo(map)
 
 //Layer that displays the whole trajectory of the drone
+// with circles
 var wholeTripCircleLayer =
     {
         id: 'wholeTripCircleLayer',
@@ -115,7 +126,7 @@ var threeDlayer =
     };
 
 
-//Point cloud layer is taken from deck gl. Still not correctly displayed
+//Point cloud layer that is taken from deck gl. Still not correctly displayed
 var pointCloudLayer = new MapboxLayer(
     {
         id: 'deckgl-PointCloudLayer',
@@ -157,7 +168,7 @@ map.on('load', function ()
             popup.setLngLat(currentCoordinate);
             marker.setLngLat(currentCoordinate);
 
-            if (i === 120) //Random point to stop
+            if (i === 80) //Random point to stop
             {
                 clearMap(trailLayerStyle, marker, droneTimer, wholeTripCircleLayer)
             }
