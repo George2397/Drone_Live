@@ -21,6 +21,7 @@ var map = new mapboxgl.Map({
 // Add zoom and rotation controls to the map.
 map.addControl(new mapboxgl.NavigationControl());
 
+//Shows the coordinates of the mouse pointer
 map.on('mousemove', function(e) {
     document.getElementById('sidebarStyle').innerHTML =
         "Longitude: " + e.lngLat.lat.toFixed(5) + '<br />' +
@@ -31,7 +32,8 @@ map.on('mousemove', function(e) {
 var popup = new mapboxgl.Popup({closeOnClick: false})
     .setLngLat([33.4151176797, 35.1452954125])
     .setHTML('<h3>Drone Test</h3>')
-    .addTo(map);
+    .addTo(map)
+    .remove();
 
 var el = document.createElement('div');
 el.className = 'marker';
@@ -77,8 +79,8 @@ var wholeTripCircleLayer =
     }
 
 //following url contains only one feature which is updated every ~100ms
-var url = 'http://localhost:63340/Drone_Live/pythonLocUpdate_Script/aiders.geojson'; //Works as well
-// var url = 'pythonLocUpdate_Script/aiders.geojson';
+// var url = 'http://localhost:63340/Drone_Live/pythonLocUpdate_Script/aiders.geojson'; //Works as well
+var url = 'pythonLocUpdate_Script/aiders.geojson';
 
 //This object is required to display the yellow trail of the drone
 var droneTrailObject =
@@ -111,6 +113,8 @@ var trailLayerData =
             }
     };
 
+
+//ANTENA 3D MODEL
 //=====================================================================================================================
 {
     // parameters to ensure the model is georeferenced correctly on the map
@@ -140,7 +144,7 @@ var trailLayerData =
     var THREE = window.THREE;
 
 // configuration of the custom layer for a 3D model per the CustomLayerInterface
-    var customLayer = {
+    var antena3Dmodel = {
         id: '3d-model',
         type: 'custom',
         renderingMode: '3d',
@@ -161,7 +165,7 @@ var trailLayerData =
             var loader = new THREE.GLTFLoader();
             loader.load(
                 'https://docs.mapbox.com/mapbox-gl-js/assets/34M_17/34M_17.gltf',
-                // 'random_threeD.gltf',
+                // 'models\random_threeD.gltf',
                 function(gltf) {
                     this.scene.add(gltf.scene);
                 }.bind(this)
@@ -218,7 +222,8 @@ var trailLayerData =
 
 }
 //=====================================================================================================================
-//This is a mapbox layer that adds height to the buildings
+
+//Mapbox layer that adds height to the buildings
 var threeDlayer =
     {
         'id': '3d-buildings',
@@ -234,7 +239,7 @@ var threeDlayer =
     };
 
 
-//Point cloud layer that is taken from deck gl. Still not correctly displayed
+//Point cloud layer that is taken from deck gl and is in json format. Still not correctly displayed
 var pointCloudLayer = new MapboxLayer(
     {
         id: 'deckgl-PointCloudLayer',
@@ -248,20 +253,93 @@ var pointCloudLayer = new MapboxLayer(
     }
 );
 
-// Create a mapbox-compatible deck.gl layer
-const myDeckLayer = new MapboxLayer({
+
+var scatterPlotData = [];
+
+//3D scatter plot layer from Deck GL
+const scatterPlotLayer = new MapboxLayer({
     id: 'my-scatterplot',
     type: ScatterplotLayer,
-    data: [
-        {position: [100.434,30.3344, 10], size: 3}
-
-    ],
+    data: scatterPlotData,
     getPosition: d => d.position,
     getRadius: d => d.size,
     getColor: [255, 0, 0]
 });
 
 
+var duckInitialPosition = [33.41488, 35.14607];
+var destination, line;
+var duck;
+
+//3D layer that visualizes a duck
+var duckLayer =
+    {
+        id: 'duck_layer',
+        type: 'custom',
+        renderingMode: '3d',
+        onAdd: function (map, mbxContext) {
+
+            window.tb = new Threebox(
+                map,
+                mbxContext,
+                { defaultLights: true }
+            );
+
+            var options = {
+                obj: 'models\\Duck.glb',
+                type: 'gltf',
+                scale: 40,
+                units: 'meters',
+                rotation: { x: 90, y: 0, z: 0 } //default rotation
+            }
+
+            tb.loadObj(options, function (model) {
+                duck = model.setCoords(duckInitialPosition);
+                tb.add(duck);
+            })
+
+
+        },
+        render: function (gl, matrix) {
+            tb.update();
+        }
+    };
+
+var soldierInitialPosition = [ 33.4151176797,35.1452954125]
+
+//3D layer that visualizes a soldier
+var soldierLayer =
+    {
+        id: 'soldier_layer',
+        type: 'custom',
+        renderingMode: '3d',
+        onAdd: function (map, mbxContext) {
+
+            window.tb = new Threebox(
+                map,
+                mbxContext,
+                { defaultLights: true }
+            );
+
+            var options = {
+                obj: 'models\\Soldier.glb',
+                type: 'gltf',
+                scale: 10,
+                units: 'meters',
+                rotation: { x: 90, y: 0, z: 0 } //default rotation
+            }
+
+            tb.loadObj(options, function (model) {
+                soldier = model.setCoords(soldierInitialPosition);
+                tb.add(soldier);
+            })
+
+
+        },
+        render: function (gl, matrix) {
+            tb.update();
+        }
+    };
 
 
 map.on('style.load', function ()
@@ -284,23 +362,17 @@ map.on('style.load', function ()
                     size: 5
                 };
 
-            myDeckLayer.props.data.push(currentCoordinateObject)
-            droneTrailObject.features[0].geometry.coordinates.push(currentCoordinate)
+            updateScatterPlotLayer(currentCoordinateObject);
 
-            if (currentBatteryLevel > 80)
-            {
-                popup.setHTML('<h2>Drone Testing</h2><h3 style="color: #228e05">Battery over 80!</h3>');
-            }
-            else
-            {
-                popup.setHTML('<h2>Drone Testing</h2><h3 style="color: red">Battery under 80!</h3>');
-            }
+            updateTooltip(currentBatteryLevel)
+            console.log(scatterPlotData)
 
             map.getSource('trajectory').setData(droneTrailObject);
             popup.setLngLat(currentCoordinate);
             marker.setLngLat(currentCoordinate);
-
+            soldier.setCoords(currentCoordinate);
             moveThreeDElement(currentCoordinate,i);
+
             if (i === 100) //Random point to stop
             {
                 clearMap(trailLayerData, marker, droneTimer, wholeTripCircleLayer)
@@ -310,18 +382,18 @@ map.on('style.load', function ()
     }
 
     map.addSource('trajectory', {type: 'geojson', data: droneTrailObject});
-    // map.addSource('my-scatterplot', {type: 'geojson', data: myDeckLayer});
     map.addLayer(trailLayerData);
     map.addLayer(wholeTripCircleLayer)
     map.addLayer(threeDlayer, 'waterway-label')
     map.addLayer(pointCloudLayer, 'waterway-label')
-    map.addLayer(myDeckLayer, 'waterway-label');
-    map.addLayer(customLayer, 'waterway-label');
+    map.addLayer(scatterPlotLayer, 'waterway-label');
+    map.addLayer(antena3Dmodel, 'waterway-label');
+    map.addLayer(soldierLayer);
+    map.addLayer(duckLayer);
+
 });
 
-/*
-* Clears all the layers from the map
- */
+/* Clears all the layers from the map*/
 function clearMap(droneTrailLayer, marker, droneTimer, wholeTripCircleLayer)
 {
     clearInterval(droneTimer)
@@ -371,11 +443,13 @@ function dragElement(elmnt) {
     }
 }
 
+/*Moves the 3d element to the current position of the drone*/
 function moveThreeDElement(currentCoordinate, i)
 {
     modelOrigin = [currentCoordinate[0], currentCoordinate[1]];
-    // modelAltitude = currentCoordinate[2];
-    modelAltitude = i; //Giving the repetition as an altitude to check if it works
+    // modelOrigin = [ currentCoordinate[1], currentCoordinate[0]];
+    modelAltitude = currentCoordinate[2];
+    // modelAltitude = i; //Giving the repetition as an altitude to check if it works
 
     modelAsMercatorCoordinate = mapboxgl.MercatorCoordinate.fromLngLat(
         modelOrigin,
@@ -385,4 +459,28 @@ function moveThreeDElement(currentCoordinate, i)
     modelTransform.translateX = modelAsMercatorCoordinate.x;
     modelTransform.translateY = modelAsMercatorCoordinate.y;
     modelTransform.translateZ = modelAsMercatorCoordinate.z;
+}
+
+/*Updates the Scatter Plot Layer*/
+function updateScatterPlotLayer(currentCoordinateObject)
+{
+    scatterPlotData = scatterPlotData.concat(currentCoordinateObject)
+    scatterPlotLayer.setProps(
+        {
+            data: scatterPlotData
+        }
+    );
+}
+
+/*Updates the text on the tooltip based on the battery level*/
+function updateTooltip(currentBatteryLevel)
+{
+    if (currentBatteryLevel > 80)
+    {
+        popup.setHTML('<h2>Drone Testing</h2><h3 style="color: #228e05">Battery over 80!</h3>');
+    }
+    else
+    {
+        popup.setHTML('<h2>Drone Testing</h2><h3 style="color: red">Battery under 80!</h3>');
+    }
 }
