@@ -11,7 +11,7 @@ const {MapboxLayer, PointCloudLayer, LineLayer} = deck;
 
 var map = new mapboxgl.Map({
     container: 'map',
-    style: 'mapbox://styles/mapbox/light-v10',
+    style: 'mapbox://styles/mapbox/dark-v10',
     pitch: 60,
     zoom: 17.5,
     center: [ 33.4151176797,35.1452954125]
@@ -33,7 +33,7 @@ var popup = new mapboxgl.Popup({closeOnClick: false})
     .setLngLat([33.4151176797, 35.1452954125])
     .setHTML('<h3>Drone Test</h3>')
     .addTo(map)
-    .remove(); //TODO: Right now tooltip is removed. Remember to remove this line later
+    .remove(); //TODO: Right now tooltip is removed. Remember to re-display it by removing this line
 
 var el = document.createElement('div');
 el.className = 'marker';
@@ -100,7 +100,7 @@ var droneTrailObject =
     };
 
 //Data needed to show the 2D trail of the drone
-var trailLayerData =
+var twoDtrailLayerData =
     {
         "id": "trailLayerStyle",
         "type": "line",
@@ -113,116 +113,6 @@ var trailLayerData =
             }
     };
 
-
-//ANTENA 3D MODEL
-//=====================================================================================================================
-{
-    // parameters to ensure the model is georeferenced correctly on the map
-    var modelOrigin = [33.4151176797, 35.1452954125];
-    var modelAltitude = 0;
-    var modelRotate = [Math.PI / 2, 0, 0];
-
-    var modelAsMercatorCoordinate = mapboxgl.MercatorCoordinate.fromLngLat(
-        modelOrigin,
-        modelAltitude
-    );
-
-// transformation parameters to position, rotate and scale the 3D model onto the map
-    var modelTransform = {
-        translateX: modelAsMercatorCoordinate.x,
-        translateY: modelAsMercatorCoordinate.y,
-        translateZ: modelAsMercatorCoordinate.z,
-        rotateX: modelRotate[0],
-        rotateY: modelRotate[1],
-        rotateZ: modelRotate[2],
-        /* Since our 3D model is in real world meters, a scale transform needs to be
-         * applied since the CustomLayerInterface expects units in MercatorCoordinates.
-         */
-        scale: modelAsMercatorCoordinate.meterInMercatorCoordinateUnits()
-    };
-
-    var THREE = window.THREE;
-
-// configuration of the custom layer for a 3D model per the CustomLayerInterface
-    var antena3Dmodel = {
-        id: '3d-model',
-        type: 'custom',
-        renderingMode: '3d',
-        onAdd: function(map, gl) {
-            this.camera = new THREE.Camera();
-            this.scene = new THREE.Scene();
-
-            // create two three.js lights to illuminate the model
-            var directionalLight = new THREE.DirectionalLight(0xffffff);
-            directionalLight.position.set(0, -70, 100).normalize();
-            this.scene.add(directionalLight);
-
-            var directionalLight2 = new THREE.DirectionalLight(0xffffff);
-            directionalLight2.position.set(0, 70, 100).normalize();
-            this.scene.add(directionalLight2);
-
-            // use the three.js GLTF loader to add the 3D model to the three.js scene
-            var loader = new THREE.GLTFLoader();
-            loader.load(
-                'https://docs.mapbox.com/mapbox-gl-js/assets/34M_17/34M_17.gltf',
-                // 'models\random_threeD.gltf',
-                function(gltf) {
-                    this.scene.add(gltf.scene);
-                }.bind(this)
-            );
-            this.map = map;
-
-            // use the Mapbox GL JS map canvas for three.js
-            this.renderer = new THREE.WebGLRenderer({
-                canvas: map.getCanvas(),
-                context: gl,
-                antialias: true
-            });
-
-            this.renderer.autoClear = false;
-        },
-        render: function(gl, matrix) {
-            var rotationX = new THREE.Matrix4().makeRotationAxis(
-                new THREE.Vector3(1, 0, 0),
-                modelTransform.rotateX
-            );
-            var rotationY = new THREE.Matrix4().makeRotationAxis(
-                new THREE.Vector3(0, 1, 0),
-                modelTransform.rotateY
-            );
-            var rotationZ = new THREE.Matrix4().makeRotationAxis(
-                new THREE.Vector3(0, 0, 1),
-                modelTransform.rotateZ
-            );
-
-            var m = new THREE.Matrix4().fromArray(matrix);
-            var l = new THREE.Matrix4()
-                .makeTranslation(
-                    modelTransform.translateX,
-                    modelTransform.translateY,
-                    modelTransform.translateZ
-                )
-                .scale(
-                    new THREE.Vector3(
-                        modelTransform.scale,
-                        -modelTransform.scale,
-                        modelTransform.scale
-                    )
-                )
-                .multiply(rotationX)
-                .multiply(rotationY)
-                .multiply(rotationZ);
-
-            this.camera.projectionMatrix = m.multiply(l);
-            this.renderer.state.reset();
-            this.renderer.render(this.scene, this.camera);
-            this.map.triggerRepaint();
-        }
-    };
-
-}
-//=====================================================================================================================
-
 //Mapbox layer that adds height to the buildings
 var threeDlayer =
     {
@@ -233,7 +123,7 @@ var threeDlayer =
         'type': 'fill-extrusion',
         'minzoom': 15,
         'paint': {
-            'fill-extrusion-color': '#ccc',
+            'fill-extrusion-color': '#827f7f',
             'fill-extrusion-height': ["get", "height"]
         }
     };
@@ -322,7 +212,7 @@ var soldierLayer =
             var options = {
                 obj: 'models\\Soldier.glb',
                 type: 'gltf',
-                scale: 1,
+                scale: 40,
                 units: 'meters',
                 rotation: { x: 90, y: 0, z: 0 } //default rotation
             }
@@ -339,12 +229,17 @@ var soldierLayer =
         }
     };
 
+/*3D layer that shows the trajectory of the drone in the form of line*/
 const lineLayer = new MapboxLayer({
     id: 'line',
     type: LineLayer,
     data: [],
     fp64: false,
-    widthScale: 100,
+    widthScale: 5,
+    getWidth: 90,
+    opacity: 0.3,
+    widthUnit: 'meters',
+    strokeWidth: 10,
     getSourcePosition: d => d.source,
     getTargetPosition: d => d.dest,
     getColor: d => d.color
@@ -386,7 +281,8 @@ map.on('style.load', function ()
                 {
                     source: previousCoordinate,
                     dest: currentCoordinate,
-                    color: getColor(currentBatteryLevel,red,green, blue)
+                    // color: getColor(currentBatteryLevel,red,green, blue)
+                    color: [23, 184, 190]
                 };
 
             updateLineLayer(currentLineLayerData, i)
@@ -397,26 +293,25 @@ map.on('style.load', function ()
             popup.setLngLat(currentCoordinate);
             marker.setLngLat(currentCoordinate);
             soldier.setCoords(currentCoordinate);
-            moveThreeDElement(currentCoordinate,i);
 
             if (i === 100) //Random point to stop
             {
-                clearMap(trailLayerData, marker, droneTimer, wholeTripCircleLayer)
+                clearMap(twoDtrailLayerData, marker, droneTimer, wholeTripCircleLayer)
             }
             i++;
         });
     }
 
-    map.addSource('trajectory', {type: 'geojson', data: droneTrailObject});
-    map.addLayer(trailLayerData);
+    map.addSource('trajectory', {type: 'geojson', data: droneTrailObject}); //Just to show the trajectory in 2D
+    map.addLayer(twoDtrailLayerData);
     map.addLayer(wholeTripCircleLayer)
     map.addLayer(threeDlayer, 'waterway-label')
-    map.addLayer(pointCloudLayer, 'waterway-label')
-    map.addLayer(scatterPlotLayer, 'waterway-label');
-    map.addLayer(antena3Dmodel, 'waterway-label');
     map.addLayer(soldierLayer);
-    map.addLayer(duckLayer);
-    // map.addLayer(lineLayer);
+    map.addLayer(lineLayer);
+    // map.addLayer(pointCloudLayer, 'waterway-label')
+    // map.addLayer(scatterPlotLayer, 'waterway-label');
+    // map.addLayer(antena3Dmodel, 'waterway-label');
+    // map.addLayer(duckLayer);
 });
 
 /* Clears all the layers from the map*/
@@ -469,23 +364,6 @@ function dragElement(elmnt) {
     }
 }
 
-/*Moves the 3d element to the current position of the drone*/
-function moveThreeDElement(currentCoordinate, i)
-{
-    modelOrigin = [currentCoordinate[0], currentCoordinate[1]];
-    // modelOrigin = [ currentCoordinate[1], currentCoordinate[0]];
-    modelAltitude = currentCoordinate[2];
-    // modelAltitude = i; //Giving the repetition as an altitude to check if it works
-
-    modelAsMercatorCoordinate = mapboxgl.MercatorCoordinate.fromLngLat(
-        modelOrigin,
-        modelAltitude
-    );
-
-    modelTransform.translateX = modelAsMercatorCoordinate.x;
-    modelTransform.translateY = modelAsMercatorCoordinate.y;
-    modelTransform.translateZ = modelAsMercatorCoordinate.z;
-}
 
 /*Updates the Scatter Plot Layer*/
 function updateScatterPlotLayer(currentScatterLayerData)
@@ -510,7 +388,6 @@ function updateLineLayer(currentLineLayerData, iteration)
             }
         );
     }
-
 }
 
 /*Updates the text on the tooltip based on the battery level*/
