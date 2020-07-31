@@ -15,7 +15,7 @@ var map = new mapboxgl.Map({
     pitch: 60,
     zoom: 17.5,
     center: [ 33.4151176797,35.1452954125]
-    // center: [148.9819, -35.39847]
+    // center: [51.51, -0.11]
 });
 
 // Add zoom and rotation controls to the map.
@@ -24,8 +24,8 @@ map.addControl(new mapboxgl.NavigationControl());
 //Shows the coordinates of the mouse pointer
 map.on('mousemove', function(e) {
     document.getElementById('sidebarStyle').innerHTML =
-        "Longitude: " + e.lngLat.lat.toFixed(5) + '<br />' +
-        "Latitude: " + e.lngLat.lng.toFixed(5) + '<br />' +
+        "Longitude: " + e.lngLat.lat.toFixed(8) + '<br />' +
+        "Latitude: " + e.lngLat.lng.toFixed(8) + '<br />' +
         "Zoom: " + map.getZoom().toFixed(2)
 });
 
@@ -33,7 +33,7 @@ var popup = new mapboxgl.Popup({closeOnClick: false})
     .setLngLat([33.4151176797, 35.1452954125])
     .setHTML('<h3>Drone Test</h3>')
     .addTo(map)
-    .remove();
+    .remove(); //TODO: Right now tooltip is removed. Remember to remove this line later
 
 var el = document.createElement('div');
 el.className = 'marker';
@@ -43,8 +43,7 @@ var marker = new mapboxgl
     .setLngLat([33.4151176797, 35.1452954125])
     .addTo(map)
 
-//Layer that displays the whole trajectory of the drone
-// with circles
+//Layer that displays the whole trajectory of the drone with circles in 2D
 var wholeTripCircleLayer =
     {
         id: 'wholeTripCircleLayer',
@@ -100,6 +99,7 @@ var droneTrailObject =
         ]
     };
 
+//Data needed to show the 2D trail of the drone
 var trailLayerData =
     {
         "id": "trailLayerStyle",
@@ -244,7 +244,7 @@ var pointCloudLayer = new MapboxLayer(
     {
         id: 'deckgl-PointCloudLayer',
         type: PointCloudLayer,
-        data: 'ballPointCloud.json',
+        data: 'models\\ballPointCloud.json',
         getPosition: d => d.position,
         getColor: d => d.color,
         sizeUnits: 'meters',
@@ -253,25 +253,23 @@ var pointCloudLayer = new MapboxLayer(
     }
 );
 
-
 var scatterPlotData = [];
 
-//3D scatter plot layer from Deck GL
+//3D scatter plot layer from Deck GL to show the trail of the drone in 3D
 const scatterPlotLayer = new MapboxLayer({
     id: 'my-scatterplot',
     type: ScatterplotLayer,
-    data: scatterPlotData,
+    data: [],
     getPosition: d => d.position,
     getRadius: d => d.size,
-    getColor: [255, 0, 0]
+    getColor: d => d.color
 });
 
-
-var duckInitialPosition = [33.41488, 35.14607];
+var duckInitialPosition = [33.41372808, 35.14586896, 100];
 var destination, line;
 var duck;
 
-//3D layer that visualizes a duck
+//3D layer model that visualizes a duck
 var duckLayer =
     {
         id: 'duck_layer',
@@ -288,7 +286,7 @@ var duckLayer =
             var options = {
                 obj: 'models\\Duck.glb',
                 type: 'gltf',
-                scale: 40,
+                scale: 1,
                 units: 'meters',
                 rotation: { x: 90, y: 0, z: 0 } //default rotation
             }
@@ -307,7 +305,7 @@ var duckLayer =
 
 var soldierInitialPosition = [ 33.4151176797,35.1452954125]
 
-//3D layer that visualizes a soldier
+//3D layer model that visualizes a soldier
 var soldierLayer =
     {
         id: 'soldier_layer',
@@ -324,7 +322,7 @@ var soldierLayer =
             var options = {
                 obj: 'models\\Soldier.glb',
                 type: 'gltf',
-                scale: 10,
+                scale: 1,
                 units: 'meters',
                 rotation: { x: 90, y: 0, z: 0 } //default rotation
             }
@@ -341,6 +339,21 @@ var soldierLayer =
         }
     };
 
+const lineLayer = new MapboxLayer({
+    id: 'line',
+    type: LineLayer,
+    data: [],
+    fp64: false,
+    widthScale: 100,
+    getSourcePosition: d => d.source,
+    getTargetPosition: d => d.dest,
+    getColor: d => d.color
+});
+
+var lineLayerData = [];
+var currentCoordinate;
+var previousCoordinate;
+var blue = 0.0, red = 0.0, green = 0.0;
 
 map.on('style.load', function ()
 {
@@ -352,20 +365,33 @@ map.on('style.load', function ()
     {
         $.getJSON(url, function (geojson)
         {
-            var currentCoordinate = geojson.geometry.coordinates;
+            if (currentCoordinate!= null)
+            {
+                previousCoordinate = currentCoordinate;
+            }
+            currentCoordinate = geojson.geometry.coordinates;
+
+            // previousBatteryLevel = currentBatteryLevel;
             var currentBatteryLevel = geojson.properties.batttery
             var currentFeature = geojson;
 
-            var currentCoordinateObject =
+            var currentScatterLayerData =
                 {
                     position: currentCoordinate,
-                    size: 5
+                    size: 5,
+                    color: getColor(currentBatteryLevel, red, green, blue)
                 };
 
-            updateScatterPlotLayer(currentCoordinateObject);
+            var currentLineLayerData =
+                {
+                    source: previousCoordinate,
+                    dest: currentCoordinate,
+                    color: getColor(currentBatteryLevel,red,green, blue)
+                };
 
+            updateLineLayer(currentLineLayerData, i)
+            updateScatterPlotLayer(currentScatterLayerData);
             updateTooltip(currentBatteryLevel)
-            console.log(scatterPlotData)
 
             map.getSource('trajectory').setData(droneTrailObject);
             popup.setLngLat(currentCoordinate);
@@ -390,7 +416,7 @@ map.on('style.load', function ()
     map.addLayer(antena3Dmodel, 'waterway-label');
     map.addLayer(soldierLayer);
     map.addLayer(duckLayer);
-
+    // map.addLayer(lineLayer);
 });
 
 /* Clears all the layers from the map*/
@@ -462,14 +488,29 @@ function moveThreeDElement(currentCoordinate, i)
 }
 
 /*Updates the Scatter Plot Layer*/
-function updateScatterPlotLayer(currentCoordinateObject)
+function updateScatterPlotLayer(currentScatterLayerData)
 {
-    scatterPlotData = scatterPlotData.concat(currentCoordinateObject)
+    scatterPlotData = scatterPlotData.concat(currentScatterLayerData)
     scatterPlotLayer.setProps(
         {
             data: scatterPlotData
         }
     );
+}
+
+/*Updates lineLayer Data*/
+function updateLineLayer(currentLineLayerData, iteration)
+{
+    if (iteration > 0)
+    {
+        lineLayerData = lineLayerData.concat(currentLineLayerData)
+        lineLayer.setProps(
+            {
+                data: lineLayerData
+            }
+        );
+    }
+
 }
 
 /*Updates the text on the tooltip based on the battery level*/
@@ -483,4 +524,22 @@ function updateTooltip(currentBatteryLevel)
     {
         popup.setHTML('<h2>Drone Testing</h2><h3 style="color: red">Battery under 80!</h3>');
     }
+}
+
+/*Returns a color based on the drone's current battery level*/
+function getColor(currentBatteryLevel, red,blue,green)
+{
+    var scaledValue = currentBatteryLevel / 100;
+    if(scaledValue <= 0.5)
+    {
+        red = (scaledValue * 2) * 255.0;
+        green = 255.0;
+        blue = 0;
+    }else
+    {
+        red = 255.0;
+        green = 255.0 + 255.0 - ((scaledValue  * 2)* 255);
+        blue = 0;
+    }
+    return [red, green, blue]
 }
