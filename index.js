@@ -1,4 +1,6 @@
 //Make the video element draggagle:
+const DRONE_1 = 1;
+const DRONE_2 = 2;
 var videoFrame = document.getElementById("mydiv");
 
 if (videoFrame)
@@ -79,7 +81,8 @@ var wholeTripCircleLayer =
 
 //following url contains only one feature which is updated every ~100ms
 // var url = 'http://localhost:63340/Drone_Live/pythonLocUpdate_Script/aiders.geojson'; //Works as well
-var url = 'pythonLocUpdate_Script/aiders.geojson';
+var drone1URL = 'pythonLocUpdate_Script/aiders.geojson';
+var drone2URL = 'pythonLocUpdate_Script/aiders2.geojson';
 
 //This object is required to display the yellow trail of the drone
 var droneTrailObject =
@@ -155,7 +158,7 @@ const scatterPlotLayer = new MapboxLayer({
     getColor: d => d.color
 });
 
-var duckInitialPosition = [33.41372808, 35.14586896, 100];
+var duckInitialPosition = [ 33.4151176797,35.1452954125];
 var destination, line;
 var duck;
 
@@ -176,7 +179,7 @@ var duckLayer =
             var options = {
                 obj: 'models\\Duck.glb',
                 type: 'gltf',
-                scale: 1,
+                scale: 20,
                 units: 'meters',
                 rotation: { x: 90, y: 0, z: 0 } //default rotation
             }
@@ -230,8 +233,22 @@ var soldierLayer =
     };
 
 /*3D layer that shows the trajectory of the drone in the form of line*/
-const lineLayer = new MapboxLayer({
-    id: 'line',
+const drone1LineLayer = new MapboxLayer({
+    id: 'drone1Line',
+    type: LineLayer,
+    data: [],
+    fp64: false,
+    widthScale: 5,
+    getWidth: 90,
+    opacity: 0.3,
+    widthUnit: 'meters',
+    strokeWidth: 10,
+    getSourcePosition: d => d.source,
+    getTargetPosition: d => d.dest,
+    getColor: d => d.color
+});
+const drone2LineLayer = new MapboxLayer({
+    id: 'drone2Line',
     type: LineLayer,
     data: [],
     fp64: false,
@@ -245,54 +262,67 @@ const lineLayer = new MapboxLayer({
     getColor: d => d.color
 });
 
-var lineLayerData = [];
-var currentCoordinate;
-var previousCoordinate;
+
 var blue = 0.0, red = 0.0, green = 0.0;
 
+var drone1 =
+    {
+        currentCoordinate: undefined,
+        previousCoordinate: undefined,
+        currentBatteryLevel: undefined
+    };
+var drone2 =
+    {
+        currentCoordinate: undefined,
+        previousCoordinate: undefined,
+        currentBatteryLevel: undefined
+    };
 map.on('style.load', function ()
 {
     var i = 0;
     var updateInterval = 100; //milliseconds
     var droneTimer = setInterval(droneUpdate, updateInterval)
 
+    var drone1LineData = [];
+    var drone2LineData = [];
     function droneUpdate()
     {
-        $.getJSON(url, function (geojson)
-        {
-            if (currentCoordinate!= null)
-            {
-                previousCoordinate = currentCoordinate;
-            }
-            currentCoordinate = geojson.geometry.coordinates;
 
-            // previousBatteryLevel = currentBatteryLevel;
+        //GET DATA FROM DRONE 1
+        $.getJSON(drone1URL, function (geojson)
+        {
+            if (drone1.currentCoordinate!= null)
+            {
+                drone1.previousCoordinate = drone1.currentCoordinate;
+            }
+            drone1.currentCoordinate = geojson.geometry.coordinates;
+
             var currentBatteryLevel = geojson.properties.batttery
             var currentFeature = geojson;
 
             var currentScatterLayerData =
                 {
-                    position: currentCoordinate,
+                    position: drone1.currentCoordinate,
                     size: 5,
                     color: getColor(currentBatteryLevel, red, green, blue)
                 };
 
             var currentLineLayerData =
                 {
-                    source: previousCoordinate,
-                    dest: currentCoordinate,
+                    source: drone1.previousCoordinate,
+                    dest: drone1.currentCoordinate,
                     // color: getColor(currentBatteryLevel,red,green, blue)
                     color: [23, 184, 190]
                 };
 
-            updateLineLayer(currentLineLayerData, i)
+            drone1LineData =  updateLineLayer(currentLineLayerData, i, drone1LineData, DRONE_1)
             updateScatterPlotLayer(currentScatterLayerData);
             updateTooltip(currentBatteryLevel)
 
             map.getSource('trajectory').setData(droneTrailObject);
-            popup.setLngLat(currentCoordinate);
-            marker.setLngLat(currentCoordinate);
-            soldier.setCoords(currentCoordinate);
+            popup.setLngLat(drone1.currentCoordinate);
+            marker.setLngLat(drone1.currentCoordinate);
+            soldier.setCoords([drone1.currentCoordinate[0], drone1.currentCoordinate[1], drone1.currentCoordinate[2]]);
 
             if (i === 100) //Random point to stop
             {
@@ -300,6 +330,32 @@ map.on('style.load', function ()
             }
             i++;
         });
+
+
+        // GET DATA FROM DRONE 2
+        $.getJSON(drone2URL, function (geojson)
+        {
+            if (drone2.currentCoordinate!= null)
+            {
+                drone2.previousCoordinate = drone2.currentCoordinate;
+            }
+                drone2.currentCoordinate = geojson.geometry.coordinates;
+
+                var currentLineDataDrone2 =
+                    {
+                        source: [drone2.previousCoordinate[0], drone2.previousCoordinate[1] + 0.002, drone2.previousCoordinate[2]],
+                        dest: [drone2.currentCoordinate[0], drone2.currentCoordinate[1] + 0.002, drone2.currentCoordinate[2]],
+                        // color: getColor(currentBatteryLevel,red,green, blue)
+                        color: [23, 184, 190]
+                    };
+
+                drone2.currentCoordinate = geojson.geometry.coordinates;
+                duck.setCoords([drone2.currentCoordinate[0], drone2.currentCoordinate[1] + 0.002, drone2.currentCoordinate[2]])
+
+                drone2LineData = updateLineLayer(currentLineDataDrone2, i, drone2LineData, DRONE_2);
+                console.log(drone2LineData)
+        });
+
     }
 
     map.addSource('trajectory', {type: 'geojson', data: droneTrailObject}); //Just to show the trajectory in 2D
@@ -307,11 +363,12 @@ map.on('style.load', function ()
     map.addLayer(wholeTripCircleLayer)
     map.addLayer(threeDlayer, 'waterway-label')
     map.addLayer(soldierLayer);
-    map.addLayer(lineLayer);
+    map.addLayer(drone1LineLayer);
+    map.addLayer(drone2LineLayer);
     // map.addLayer(pointCloudLayer, 'waterway-label')
     // map.addLayer(scatterPlotLayer, 'waterway-label');
     // map.addLayer(antena3Dmodel, 'waterway-label');
-    // map.addLayer(duckLayer);
+    map.addLayer(duckLayer);
 });
 
 /* Clears all the layers from the map*/
@@ -364,7 +421,6 @@ function dragElement(elmnt) {
     }
 }
 
-
 /*Updates the Scatter Plot Layer*/
 function updateScatterPlotLayer(currentScatterLayerData)
 {
@@ -377,17 +433,31 @@ function updateScatterPlotLayer(currentScatterLayerData)
 }
 
 /*Updates lineLayer Data*/
-function updateLineLayer(currentLineLayerData, iteration)
+function updateLineLayer(currentLineLayerData, iteration, droneData, whichDrone)
 {
     if (iteration > 0)
     {
-        lineLayerData = lineLayerData.concat(currentLineLayerData)
-        lineLayer.setProps(
-            {
-                data: lineLayerData
-            }
-        );
+        if (whichDrone === DRONE_1)
+        {
+            droneData = droneData.concat(currentLineLayerData)
+            drone1LineLayer.setProps(
+                {
+                    data: droneData
+                }
+            );
+        }
+        else if (whichDrone === DRONE_2)
+        {
+            droneData = droneData.concat(currentLineLayerData)
+            drone2LineLayer.setProps(
+                {
+                    data: droneData
+                }
+            );
+        }
     }
+
+    return droneData;
 }
 
 /*Updates the text on the tooltip based on the battery level*/

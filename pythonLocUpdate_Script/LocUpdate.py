@@ -25,6 +25,11 @@ def writeSingleGeoPoint(features):
             print(feature)
             f.flush()
             f.close()
+        with open('aiders2.geojson','w') as f:
+            json.dump(feature,f)
+            f.flush()
+            f.close()
+
         lock.release()
         time.sleep(0.08)
 
